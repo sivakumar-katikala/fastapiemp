@@ -1,7 +1,8 @@
 """
 app/core/database.py
 
-Database engine and session configuration using ASYNCHRONOUS SQLAlchemy 2.x.
+Database engine and session configuration using ASYNCHRONOUS SQLAlchemy 2.x,
+connected to a PostgreSQL server via the `asyncpg` driver.
 
 SYNC vs ASYNC SQLAlchemy
 -------------------------
@@ -10,14 +11,18 @@ SYNC vs ASYNC SQLAlchemy
   This is simple but does not play well with FastAPI's async event loop -- a
   slow query would block the whole worker from handling other requests.
 - Async SQLAlchemy (`AsyncSession`, `create_async_engine`) issues the same SQL
-  but uses `await` under the hood, driven by an async DB driver (`aiosqlite`
-  here). While waiting on I/O, the event loop is free to handle other
-  requests concurrently. This matches FastAPI's ASGI, non-blocking design.
+  but uses `await` under the hood, driven by an async DB driver (`asyncpg`
+  here, talking to a real PostgreSQL server over the network/socket instead
+  of reading a local file). While waiting on I/O, the event loop is free to
+  handle other requests concurrently. This matches FastAPI's ASGI,
+  non-blocking design.
 
 We use ONLY the async pattern here (AsyncEngine + AsyncSession) throughout
 the app, and never mix it with sync `Session` calls in request handlers --
 mixing sync and async DB code in the same app is a common source of subtle
-bugs and blocked event loops.
+bugs and blocked event loops. (The standalone `seed_data.py` script is the
+one exception -- it runs outside a request, so it uses the async pattern too
+for consistency, sharing this same engine/session setup.)
 """
 
 from collections.abc import AsyncGenerator
@@ -34,6 +39,7 @@ from app.core.config import settings
 # The async engine manages a pool of database connections. `echo=settings.DEBUG`
 # makes SQLAlchemy print the raw SQL it executes -- useful while learning/debugging,
 # turn it off (DEBUG=False) in production to reduce log noise.
+print("DATABASE URL:", settings.DATABASE_URL_ASYNC)
 engine = create_async_engine(
     settings.DATABASE_URL_ASYNC,
     echo=settings.DEBUG,

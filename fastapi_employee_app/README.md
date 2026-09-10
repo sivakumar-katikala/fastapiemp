@@ -1,15 +1,15 @@
-# Employee Management System — FastAPI
+# Employee Management System — FastAPI + PostgreSQL
 
 A complete, working Employee Management web application built with FastAPI,
-async SQLAlchemy 2.x, SQLite, JWT authentication, and a Bootstrap 5
+async SQLAlchemy 2.x, **PostgreSQL**, JWT authentication, and a Bootstrap 5
 frontend.
 
 ## Tech Stack
 
 - Python 3.11+
 - FastAPI (ASGI) + Uvicorn
-- SQLAlchemy 2.x (async, via `aiosqlite`)
-- SQLite (single local database file, no server to install/run)
+- SQLAlchemy 2.x (async, via `asyncpg`)
+- **PostgreSQL** (real client/server database — must be installed & running)
 - Pydantic v2 / pydantic-settings
 - Jinja2 templates + Bootstrap 5 + vanilla JS
 - `python-jose` (JWT) + `passlib`/`bcrypt` (password hashing)
@@ -36,6 +36,7 @@ fastapi_employee_app/
 │   └── static/                 # CSS/JS
 ├── .env.example                 # Copy to .env and fill in real values
 ├── requirements.txt
+├── seed_data.py                 # Creates tables + inserts sample data into PostgreSQL
 └── run.py                       # `python run.py` == `uvicorn app.main:app --reload`
 ```
 
@@ -56,30 +57,105 @@ pip install -r requirements.txt
 > password hashing. If you ever bump `passlib` to a newer release that
 > fixes this, you can also bump `bcrypt`.
 
-### Database setup
+## 0. Full Step-by-Step: PostgreSQL Setup
 
-No database server to install — SQLite stores everything in a single local
-file that's created automatically the first time the app runs.
+This app now uses a real PostgreSQL server instead of SQLite. Follow these
+steps in order the **first time** you set the project up.
 
-A working `.env` file with a random `SECRET_KEY` already generated is
-included in this project, so **you don't need to create or edit anything**
-— you can skip straight to "Run the application" below.
+### Step 1 — Install PostgreSQL (skip if already installed)
 
-If you'd rather generate your own `SECRET_KEY` (recommended if you plan to
-share this project or deploy it anywhere), copy `.env.example` to `.env`
-and set your own value:
+- **Windows:** download and run the installer from
+  https://www.postgresql.org/download/windows/ (the "EDB" installer). During
+  install, set a password for the default `postgres` superuser and remember
+  it — you'll need it below. It also installs **pgAdmin** (a free GUI) and
+  the `psql` command-line client.
+- **macOS:** `brew install postgresql@16 && brew services start postgresql@16`
+- **Linux (Debian/Ubuntu):** `sudo apt update && sudo apt install postgresql postgresql-contrib`
+
+Verify it's running:
 ```powershell
-copy .env.example .env
-python -c "import secrets; print(secrets.token_hex(32))"
+psql --version
 ```
-Paste the printed string into `.env` as `SECRET_KEY=...`.
 
-Tables are created automatically on application startup (see the `lifespan`
-handler in `app/main.py`) — no manual migration step is required for this
-example project. The database file (e.g. `employee_management.db`) will
-appear in the project's root folder once you run the app.
+### Step 2 — Create the project database
 
-### Run the application
+Open a terminal and connect to the PostgreSQL server as the `postgres` user
+(it will prompt for the password you set during install):
+
+```powershell
+psql -U postgres -h localhost
+```
+
+Once you're at the `postgres=#` prompt, create the database used by this app:
+
+```sql
+CREATE DATABASE employee_management;
+```
+
+Confirm it exists, then exit:
+
+```sql
+\l
+\q
+```
+
+### Step 3 — Configure the app's `.env`
+
+A working `.env` is already included with sensible local defaults:
+
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=employee_management
+```
+
+**Edit `POSTGRES_PASSWORD`** in `.env` to match the password you set for the
+`postgres` user in Step 1 (and change `POSTGRES_USER`/`POSTGRES_DB` too if
+you used different names). This is the only change required.
+
+### Step 4 — Install Python dependencies
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+This installs `asyncpg` (async PostgreSQL driver, used by the running app)
+and `psycopg2-binary` (used by `seed_data.py`), along with FastAPI and the
+rest of the stack.
+
+> **Note on bcrypt version:** `requirements.txt` pins `bcrypt==3.2.2`
+> alongside `passlib==1.7.4`. Newer `bcrypt` (4.1+) removed an internal
+> attribute that `passlib` 1.7.4 probes at import time, which breaks
+> password hashing. If you ever bump `passlib` to a newer release that
+> fixes this, you can also bump `bcrypt`.
+
+### Step 5 — Create tables and insert sample data
+
+Run the new seed script (this is the "one file for inserting data" the
+project ships with):
+
+```powershell
+python seed_data.py
+```
+
+What it does:
+1. Connects to your PostgreSQL database and creates the `users` and
+   `employees` tables (same models the app uses) if they don't exist yet.
+2. Inserts one sample login — `username=admin`, `password=Admin@123`.
+3. Inserts 5 sample employee rows.
+
+It's safe to re-run — it checks for existing rows first, so it won't
+duplicate data.
+
+*(Tables are also auto-created on app startup via the `lifespan` handler in
+`app/main.py`, so this step isn't strictly required to get the app running
+— but it's the easiest way to get real rows into PostgreSQL to look at.)*
+
+### Step 6 — Run the application
 
 ```powershell
 uvicorn app.main:app --reload
@@ -92,10 +168,60 @@ python run.py
 ```
 
 - App: http://127.0.0.1:8000
-- Frontend: http://127.0.0.1:8000/login
+- Frontend: http://127.0.0.1:8000/login  (log in with `admin` / `Admin@123`)
 - Swagger UI: http://127.0.0.1:8000/docs
 - ReDoc: http://127.0.0.1:8000/redoc
 - Health check: http://127.0.0.1:8000/health
+
+### Step 7 — View and query the data directly in PostgreSQL
+
+Open a new terminal (leave the app running) and connect with `psql`:
+
+```powershell
+psql -U postgres -h localhost -d employee_management
+```
+
+Then run any SQL you like directly against the server:
+
+```sql
+-- List all tables
+\dt
+
+-- See every employee
+SELECT * FROM employees;
+
+-- See just a few columns, newest first
+SELECT employee_id, first_name, last_name, department, salary
+FROM employees
+ORDER BY created_at DESC;
+
+-- Filter by department
+SELECT first_name, last_name, designation, salary
+FROM employees
+WHERE department = 'Engineering';
+
+-- Average salary per department
+SELECT department, ROUND(AVG(salary), 2) AS avg_salary
+FROM employees
+GROUP BY department
+ORDER BY avg_salary DESC;
+
+-- Registered users
+SELECT id, username, email, created_at FROM users;
+
+-- Exit psql
+\q
+```
+
+Prefer a GUI? Open **pgAdmin** (installed alongside PostgreSQL on Windows),
+connect to `localhost` with your `postgres` credentials, expand
+`employee_management → Schemas → public → Tables`, and right-click any
+table → **View/Edit Data → All Rows** to browse it visually, or use the
+built-in **Query Tool** to run the same SQL shown above.
+
+Any row you insert/update/delete through the FastAPI app (signup, add
+employee, edit, delete) is immediately visible here too — it's the same
+PostgreSQL database, just accessed two different ways (API vs. direct SQL).
 
 ## 2. Using the App (Frontend)
 
@@ -308,7 +434,7 @@ than blocking a worker thread:
 - **Routes** are all `async def` (`app/routers/*.py`)
 - **Services** are all `async def` (`app/services/*.py`)
 - **Database access** uses SQLAlchemy's `AsyncSession` and
-  `create_async_engine`, driven by the `aiosqlite` async driver
+  `create_async_engine`, driven by the `asyncpg` async PostgreSQL driver
   (`app/core/database.py`)
 - **`get_db()`** is an async generator dependency — it `yield`s a session
   to the route and guarantees `session.close()` runs afterward even if the
@@ -396,7 +522,7 @@ Service  (app/services/auth_service.py, employee_service.py — business logic)
    ↓
 SQLAlchemy (async ORM)
    ↓
-SQLite
+PostgreSQL
    ↓
 Response flows back up through the same layers to the Browser
 ```
@@ -428,7 +554,7 @@ Response flows back up through the same layers to the Browser
   request by `get_current_user`.
 - **SQLAlchemy** — `app/models/*.py` (table definitions),
   `app/core/database.py` (async engine/session).
-- **SQLite** — the actual database, connected to via `aiosqlite`. A single local file, no server process required.
+- **PostgreSQL** — the actual database server, connected to via `asyncpg` (async) at runtime, and `psycopg2` (sync) from `seed_data.py`.
 - **API routers** — `app/routers/*.py`, each an `APIRouter` included into
   the main `app` in `app/main.py`.
 - **Services** — `app/services/*.py`, the business-logic layer between
@@ -451,5 +577,5 @@ Response flows back up through the same layers to the Browser
    If the token is missing/invalid/expired, a 401 is raised immediately and
    the route body never executes.
 5. The route calls into `employee_service.py`, which builds and executes
-   SQLAlchemy queries against SQLite via the async session, and returns
+   SQLAlchemy queries against PostgreSQL via the async session, and returns
    ORM objects that Pydantic (`response_model=...`) serializes to JSON.

@@ -1,9 +1,10 @@
-# NOTE ON DATABASE: this project uses ASYNC SQLAlchemy with SQLite via the
-# `aiosqlite` driver. SQLite ships built into Python (no server, no
-# separate install, no C compiler needed) and stores the whole database in
-# a single local file -- ideal for a simple/local setup. If you later want
-# PostgreSQL instead, swap `aiosqlite` for `asyncpg` and update
-# DATABASE_URL_ASYNC in app/core/config.py accordingly.
+# NOTE ON DATABASE: this project uses ASYNC SQLAlchemy with a real
+# PostgreSQL server via the `asyncpg` driver (fast, native async Postgres
+# driver). `psycopg2-binary` is also included for the standalone
+# `seed_data.py` script, which uses plain sync SQLAlchemy for simplicity.
+# PostgreSQL must be installed and running separately -- see README.md.
+# Versions are pinned to releases that ship prebuilt wheels for Python 3.13
+# on Windows/macOS/Linux, so `pip install` never needs a C/C++ compiler.
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
@@ -15,7 +16,8 @@ greenlet==3.1.1
 # versions without a prebuilt greenlet wheel resolving correctly) can end up
 # missing it, causing "ValueError: the greenlet library is required..." on
 # startup.
-aiosqlite==0.20.0
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
 pydantic==2.9.2
 pydantic-settings==2.5.2
 python-jose[cryptography]==3.3.0

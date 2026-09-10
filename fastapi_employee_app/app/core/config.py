@@ -1,72 +1,51 @@
-"""
-app/core/config.py
-
-Centralized application configuration.
-
-WHY THIS FILE EXISTS
----------------------
-Hardcoding secrets (DB passwords, JWT secret keys) directly in source code is a
-security risk and makes the app impossible to configure differently across
-environments (local/dev/staging/prod). Instead, we read configuration from
-environment variables (via a ".env" file in development) using
-`pydantic-settings`. This gives us:
-  - Validation of config values at startup (fail fast if something is missing)
-  - A single, typed source of truth (`settings`) that the rest of the app imports
-  - Easy overriding via real environment variables in production (Docker, etc.)
-"""
-
-from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from urllib.parse import quote_plus
 
 
 class Settings(BaseSettings):
-    """
-    Typed application settings. Values are loaded from environment variables
-    or from a ".env" file (see `model_config` below). Pydantic validates the
-    types automatically -- e.g. ACCESS_TOKEN_EXPIRE_MINUTES must be an int.
-    """
+    # PostgreSQL configuration
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "July@20242025"  # Change this to your actual PostgreSQL password
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "employee_management"
 
-    # --- App metadata ---
-    APP_NAME: str = "Employee Management System"
-    DEBUG: bool = True
-
-    # --- SQLite database settings ---
-    # Just a filename -- SQLite stores the whole database in a single file
-    # on disk, so there's no server, user, password, or port to configure.
-    DB_NAME: str = "employee_management.db"
-
-    # --- JWT / security settings ---
-    SECRET_KEY: str
+    # JWT configuration
+    SECRET_KEY: str = "change-this-secret-key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Application configuration
+    APP_NAME: str = "Employee Management System"
+    DEBUG: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True,
         extra="ignore",
     )
 
     @property
     def DATABASE_URL_ASYNC(self) -> str:
-        """
-        Async SQLAlchemy connection string, using the aiosqlite driver.
-        Used by the app at runtime for non-blocking DB I/O.
-        """
-        return f"sqlite+aiosqlite:///./{self.DB_NAME}"
+        # URL-encode the password so special characters such as @ are handled safely.
+        password = quote_plus(self.POSTGRES_PASSWORD)
+
+        return (
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:"
+            f"{password}@{self.POSTGRES_HOST}:"
+            f"{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
+
+    @property
+    def DATABASE_URL_SYNC(self) -> str:
+        # URL-encode the password for the synchronous PostgreSQL driver as well.
+        password = quote_plus(self.POSTGRES_PASSWORD)
+
+        return (
+            f"postgresql+psycopg2://{self.POSTGRES_USER}:"
+            f"{password}@{self.POSTGRES_HOST}:"
+            f"{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
 
 
-@lru_cache
-def get_settings() -> Settings:
-    """
-    Returns a cached Settings instance.
-
-    `lru_cache` ensures the .env file / environment is only parsed once per
-    process, and every part of the app that calls get_settings() shares the
-    same Settings object instead of re-reading and re-validating every time.
-    """
-    return Settings()
-
-
-# A ready-to-import singleton, used throughout the app: `from app.core.config import settings`
-settings = get_settings()
+settings = Settings()

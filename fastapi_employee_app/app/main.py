@@ -51,7 +51,6 @@ but only as a process manager fronting Uvicorn's ASGI worker class.)
 
 import logging
 from contextlib import asynccontextmanager
-from fastapi.encoders import jsonable_encoder
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -92,7 +91,10 @@ async def lifespan(app: FastAPI):
     logger.info("Application starting up -- creating database tables if needed...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Startup complete. Database ready at '%s'.", settings.DB_NAME)
+    logger.info(
+        "Startup complete. Database ready at postgresql://%s:%s/%s.",
+        settings.POSTGRES_HOST, settings.POSTGRES_PORT, settings.POSTGRES_DB,
+    )
     yield
     logger.info("Application shutting down.")
     # (No explicit shutdown cleanup needed; the engine's connection pool is
@@ -159,13 +161,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "Validation error on %s %s: %s", request.method, request.url.path, exc.errors()
     )
     return JSONResponse(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    content=jsonable_encoder({
-        "detail": "Validation error",
-        "errors": exc.errors(),
-    }),
-)
-    
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": "Validation error", "errors": exc.errors()},
+    )
 
 
 @app.exception_handler(SQLAlchemyError)
