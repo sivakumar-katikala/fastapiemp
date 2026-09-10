@@ -1,0 +1,22 @@
+body {
+    background-color: #f5f7fa;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.card {
+    border: none;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+#alert-area {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}

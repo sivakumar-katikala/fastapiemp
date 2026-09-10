@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Sign Up · Employee Management System{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h3 class="card-title mb-4 text-center">Create an Account</h3>
+                <form id="signup-form">
+                    <div class="mb-3">
+                        <label class="form-label" for="username">Username</label>
+                        <input type="text" class="form-control" id="username" required minlength="3" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="email">Email</label>
+                        <input type="email" class="form-control" id="email" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="password">Password</label>
+                        <input type="password" class="form-control" id="password" required minlength="8" />
+                        <div class="form-text">At least 8 characters, with a letter and a number.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="confirm_password">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password" required minlength="8" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+                </form>
+                <p class="text-center mt-3 mb-0">
+                    Already have an account? <a href="/login">Log in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("signup-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const payload = {
+        username: document.getElementById("username").value.trim(),
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+        confirm_password: document.getElementById("confirm_password").value,
+    };
+    try {
+        await EMS.api("/auth/signup", { method: "POST", body: payload, auth: false });
+        EMS.showAlert("Account created successfully. Redirecting to login...", "success");
+        setTimeout(() => (window.location.href = "/login"), 1200);
+    } catch (err) {
+        EMS.showAlert(err.message, "danger");
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Employee Details · Employee Management System{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Employee Details</h2>
+    <div>
+        <a href="/employees-page/{{ employee_id }}/edit" class="btn btn-outline-secondary">Edit</a>
+        <a href="/employees-page" class="btn btn-outline-primary">Back to Records</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div id="detail-body" class="row g-3">
+            <p class="text-muted">Loading...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+EMS.requireAuth();
+
+const employeeId = {{ employee_id }};
+
+function field(label, value) {
+    return `
+    <div class="col-md-4">
+        <div class="text-muted small">${label}</div>
+        <div class="fw-semibold">${value ?? "-"}</div>
+    </div>`;
+}
+
+async function loadDetail() {
+    const container = document.getElementById("detail-body");
+    try {
+        const emp = await EMS.api(`/employees/${employeeId}`);
+        container.innerHTML = [
+            field("Employee ID", emp.employee_id),
+            field("First Name", emp.first_name),
+            field("Last Name", emp.last_name),
+            field("Email", emp.email),
+            field("Phone", emp.phone),
+            field("Age", emp.age),
+            field("Gender", emp.gender),
+            field("Department", emp.department),
+            field("Designation", emp.designation),
+            field("Salary", Number(emp.salary).toLocaleString()),
+            field("Joining Date", emp.joining_date),
+            field("Address", emp.address),
+            field("City", emp.city),
+            field("State", emp.state),
+            field("Country", emp.country),
+            field("Created At", new Date(emp.created_at).toLocaleString()),
+            field("Updated At", new Date(emp.updated_at).toLocaleString()),
+        ].join("");
+    } catch (err) {
+        EMS.showAlert(err.message, "danger");
+    }
+}
+
+loadDetail();
+</script>
+{% endblock %}
